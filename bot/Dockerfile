@@ -16,6 +16,8 @@ COPY requirements.pip .
 RUN pip3 install -r requirements.pip
 
 COPY src/bot.py .
+COPY src/utils.py .
+COPY src/settings.py .
 COPY wait-for-it.sh .
 
 CMD ["./wait-for-it.sh", "-t", "3", "db:27017", "--", "./bot.py"]
