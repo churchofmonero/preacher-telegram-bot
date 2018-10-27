@@ -13,7 +13,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-default_password}
     container_name: PreacherBot_DB
 
-  python:
+  bot:
     image: python
     build: bot
     volumes:
