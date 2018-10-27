@@ -1,0 +1,29 @@
+version: '3'
+
+services:
+  mongo_db:
+    image: mongo
+    ports: 
+      - "27017:27017"
+    volumes:
+      - /opt/PreacherBot/PreacherBot_DB:/data/db
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-default_password}
+    container_name: PreacherBot_DB
+
+  python:
+    image: python
+    build: bot
+    volumes:
+      - /opt/PreacherBot/PreacherBot_py:/usr/src/PreacherBot_py
+    restart: always
+    environment:
+      PREACHER_TELEGRAM_TOKEN: ${PREACHER_TELEGRAM_TOKEN}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-default_password}
+    depends_on:
+      - "mongo_db"
+    container_name: PreacherBot_py
+
