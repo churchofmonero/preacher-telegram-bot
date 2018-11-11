@@ -21,6 +21,7 @@ services:
     restart: always
     environment:
       PREACHER_TELEGRAM_TOKEN: ${PREACHER_TELEGRAM_TOKEN}
+      PREACHER_GROUP_ID: ${PREACHER_GROUP_ID}
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-root}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-default_password}
     depends_on:
