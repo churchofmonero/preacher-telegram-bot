@@ -15,11 +15,11 @@ EMOJI_INT = {
         '9': '9️⃣',
 }
 
-def get_emoji_faith(faith: int):
-    emoji_faith = ''
-    for ch in str(max(0, faith)):
-        emoji_faith += EMOJI_INT[ch]
-    return emoji_faith
+def get_emoji_value(value: int):
+    emoji_value = ''
+    for ch in str(max(0, value)):
+        emoji_value += EMOJI_INT[ch]
+    return emoji_value
 
 
 def sanitize(string):
