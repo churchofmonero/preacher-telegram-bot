@@ -216,10 +216,7 @@ def can_give_heart(user):
         init_user(user_obj)
         return False
     
-    logger.info(user)
-    logger.info(dir(user))
-    logger.info('faith: %d' % user['faith'])
-    logger.info('heart_gifted: %d' % user['heart_gifted'])
+    logger.info('%s: faith: %d, heart_gifted: %d' % (user['username'], user['faith'], user['heart_gifted']))
     try:
         heart_left = max(0, user['faith'] - user['heart_gifted'])
     except KeyError:
