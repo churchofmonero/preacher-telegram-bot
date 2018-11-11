@@ -21,10 +21,12 @@ BOT_USERNAME = 'XMR_Preacher_Bot'
 TELEGRAM_API_MAX_CHARS = 4000
 
 ACCESS_TOKEN = load_env('PREACHER_TELEGRAM_TOKEN')
+GROUP_ID = load_env('PREACHER_GROUP_ID')
+
 MONGO_USER = load_env('MONGO_INITDB_ROOT_USERNAME')
 MONGO_PASS = load_env('MONGO_INITDB_ROOT_PASSWORD')
-docker_mongo_service = 'mongo_db'
 
+docker_mongo_service = 'mongo_db'
 host, port = (docker_mongo_service, 27017)
 
 logger.info("Connecting to %s:%d" % (host, port))
@@ -32,10 +34,10 @@ client = MongoClient('mongodb://%s:%s@%s:%d' % (MONGO_USER, MONGO_PASS, host, po
 db = client['MoneroChurch']
 disciples = db['Disciple']
 
-# Make 'username' field unique
-username_index = 'username'
-if username_index not in disciples.index_information():
-    disciples.create_index('username', unique=True)
+# Make 'tg_user_id' field unique
+tg_user_id_index = 'tg_user_id'
+if tg_user_id_index not in disciples.index_information():
+    disciples.create_index('tg_user_id', unique=True)
 
 bot = TeleBot(ACCESS_TOKEN)
 
