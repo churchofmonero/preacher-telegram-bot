@@ -209,10 +209,16 @@ def change_field_with_reply(message, field):
 
     username = message.from_user.username
     reply_to_user = message.reply_to_message.from_user
+    admins = bot.get_chat_administrators(message.chat.id)
 
+    logger.info('@%s is trying to change @%s\'s %s' % (username, reply_to_user.username, field))
     if field == 'heart':
         amount = 1
         if black_heart in message.text:
+            if message.from_user.id not in [u.user.id for u in admins]:
+                logger.info('@%s has tried to change the heart of @%s'
+                            ', but he is not a pastor.' % (username, reply_to_user.username))
+                return
             amount = -1
 
         ret = change_field(reply_to_user, 'heart', amount)
@@ -222,25 +228,22 @@ def change_field_with_reply(message, field):
             safe_reply(message, "@%s has %s @%s's Heart! It is now %s" % (username, change, reply_to_user.username, emoji_heart))
         return
 
-    admins = bot.get_chat_administrators(message.chat.id)
-    if username not in list([a.user.username for a in admins]):
+    if message.from_user.id not in [u.user.id for u in admins]:
         logger.info('@%s has tried to change the faith of @%s'
                     ', but he is not a pastor.' % (username, reply_to_user.username))
         return
-
-    logger.info('@%s is changing @%s\'s %s' % (username, reply_to_user.username, field))
 
     if message.text in '+🙏':
         ret = change_field(reply_to_user, 'faith', 1)
         if ret == 'SUCCESS':
             emoji_faith = get_emoji_value(get_field('faith', reply_to_user))
             safe_reply(message, "@%s has increased @%s's Faith! It is now %s" % (username, reply_to_user.username, emoji_faith))
-    # elif message.text in '-🔥':
-    #     ret = change_field(reply_to_user, 'faith', -1)
-    #     if ret == 'MINIMUM FAITH':
-    #         safe_reply(message, '@%s does not have any faith in his heart! 😭' % reply_to_user.userrname)
-    #     elif ret == 'SUCCESS':
-    #         safe_reply(message, "@%s has decreased @%s's Faith! Shame!" % (username, reply_to_user.username))
+    elif message.text in '-🔥':
+        ret = change_field(reply_to_user, 'faith', -1)
+        if ret == 'MINIMUM FAITH':
+            safe_reply(message, '@%s does not have any faith in his heart! 😭' % reply_to_user.userrname)
+        elif ret == 'SUCCESS':
+            safe_reply(message, "@%s has decreased @%s's Faith! Shame!" % (username, reply_to_user.username))
 
 
 @bot.message_handler(commands=['getpastors'])
@@ -283,7 +286,7 @@ def handle_message(message):
     elif message.text == '!topheart':
         top_heart_command(message)
 
-    logger.info("%d, @%s (%d): %s" % (message.chat.id, message.from_user.id, message.from_user.username, message.text))
+    logger.info("%d, @%s (%d): %s" % (message.chat.id, message.from_user.username, message.from_user.id, message.text))
 
 bot.polling(none_stop=True)
 connection.close()
