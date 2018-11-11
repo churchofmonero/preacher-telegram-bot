@@ -109,22 +109,27 @@ def init_user(user):
         'username_lower': user.username.lower(),
         'faith': 0,
         'heart': 0,
+        'heart_gifted': 0,
     }
 
     disciples.save(new_disciple)
     #disciples.insert_one(new_disciple)
 
 
-def update_user(tg_user_id, field, amount):
-    if field not in ['heart', 'faith']:
+def update_user(tg_user_id, field, amount, inc=False):
+    logger.info("Updating user %d's %s by %d" %(tg_user_id, field, amount))
+
+    if field not in ['heart', 'faith', 'heart_gifted']:
         raise Exception('Unknown field %s' % field)
+
+    if inc:
+        update = {'$inc': {field: amount}}
+    else:
+        update = {'$set': {field: amount}}
 
     disciples.find_one_and_update(
         {'tg_user_id': tg_user_id},
-        {'$inc': {
-             field: amount,
-         }
-        },
+        update,
         upsert=True,
         return_document=ReturnDocument.AFTER
     )
@@ -143,14 +148,14 @@ def change_field(user=None, field='', amount=0):
         return error 
 
     if user.username == BOT_USERNAME:
-        return 'SELF'
+        return 'BOT'
     
     if disciples.count_documents({'tg_user_id': user.id}) == 0:
         logger.info('no result, creating @%s, uid: %d' % (user.username, user.id))
         init_user(user)
-        update_user(user.id, field, amount)
+        update_user(user.id, field, amount, inc=True)
     else:
-        update_user(user.id, field, amount)
+        update_user(user.id, field, amount, inc=True)
 
     return 'SUCCESS'
 
@@ -171,6 +176,7 @@ def get_field(field, user):
                  'faith': 1 if field == 'faith' else 0,
                  'heart': 1 if field == 'heart' else 0,
                  'tg_user_id': user.id,
+                 'heart_gifted': 0,
                  'username': user.username,
                  'username_lower': user.username.lower()
              }
@@ -189,7 +195,7 @@ def get_field(field, user):
 @bot.message_handler(func=lambda m: True, content_types=['new_chat_members'])
 def on_user_joins(message):
     new_user_name = message.new_chat_member.username
-    logger.info("Detected a new user: @%s, restricting him for two days" % new_user_name)
+    logger.info("Detected a new user: @%s, restricting him from sending GIFs, stickers and URLs for two days" % new_user_name)
 
     bot.restrict_chat_member(
         message.chat.id,
@@ -201,49 +207,74 @@ def on_user_joins(message):
     )
 
 
+def can_give_heart(user):
+    logger.info('Checking, if user %s (%d) can give heart points...' % (user.username, user.id))
+    user_obj = user
+    user = disciples.find_one({'tg_user_id': user.id})
+    if not user:
+        logger.info('no result, creating @%s, uid: %d' % (user_obj.username, user_obj.id))
+        init_user(user_obj)
+        return False
+    
+    logger.info(user)
+    logger.info(dir(user))
+    logger.info('faith: %d' % user['faith'])
+    logger.info('heart_gifted: %d' % user['heart_gifted'])
+    try:
+        heart_left = max(0, user['faith'] - user['heart_gifted'])
+    except KeyError:
+        update_user(user['tg_user_id'], 'heart_gifted', 0, inc=False)
+        heart_left = 0
+
+    logger.info('Spendable Heart points left: %d' % heart_left)
+    return heart_left > 0
+
+
 def change_field_with_reply(message, field):
     black_heart = '🖤'
 
     if message.text not in '❤️🖤+🙏-🔥':
         return
 
-    username = message.from_user.username
+    user = message.from_user
     reply_to_user = message.reply_to_message.from_user
     admins = bot.get_chat_administrators(message.chat.id)
 
-    logger.info('@%s is trying to change @%s\'s %s' % (username, reply_to_user.username, field))
+    logger.info('@%s is trying to change @%s\'s %s' % (user.username, reply_to_user.username, field))
     if field == 'heart':
-        amount = 1
-        if black_heart in message.text:
-            if message.from_user.id not in [u.user.id for u in admins]:
-                logger.info('@%s has tried to change the heart of @%s'
-                            ', but he is not a pastor.' % (username, reply_to_user.username))
-                return
-            amount = -1
+        if can_give_heart(user):
+            amount = 1
+            if black_heart in message.text:
+                if message.from_user.id not in [u.user.id for u in admins]:
+                    logger.info('@%s has tried to change the heart of @%s'
+                                ', but he is not a pastor.' % (user.username, reply_to_user.username))
+                    return
+                amount = -1
 
-        ret = change_field(reply_to_user, 'heart', amount)
-        if ret == 'SUCCESS':
-            emoji_heart = get_emoji_value(get_field('heart', reply_to_user))
-            change = 'increased' if black_heart not in message.text else 'decreased'
-            safe_reply(message, "@%s has %s @%s's Heart! It is now %s" % (username, change, reply_to_user.username, emoji_heart))
-        return
+            ret = change_field(reply_to_user, 'heart', amount)
+            if ret == 'SUCCESS':
+                change_field(user, 'heart_gifted', abs(amount))
+                emoji_heart = get_emoji_value(get_field('heart', reply_to_user))
+                change = 'increased' if black_heart not in message.text else 'decreased'
+                safe_reply(message, "@%s has %s @%s's Heart! It is now %s" % (user.username, change, reply_to_user.username, emoji_heart))
+            return
 
     if message.from_user.id not in [u.user.id for u in admins]:
         logger.info('@%s has tried to change the faith of @%s'
-                    ', but he is not a pastor.' % (username, reply_to_user.username))
+                    ', but he is not a pastor.' % (user.username, reply_to_user.username))
         return
 
     if message.text in '+🙏':
         ret = change_field(reply_to_user, 'faith', 1)
         if ret == 'SUCCESS':
             emoji_faith = get_emoji_value(get_field('faith', reply_to_user))
-            safe_reply(message, "@%s has increased @%s's Faith! It is now %s" % (username, reply_to_user.username, emoji_faith))
+            safe_reply(message, "@%s has increased @%s's Faith! It is now %s" % (user.username, reply_to_user.username, emoji_faith))
     elif message.text in '-🔥':
         ret = change_field(reply_to_user, 'faith', -1)
         if ret == 'MINIMUM FAITH':
             safe_reply(message, '@%s does not have any faith in his heart! 😭' % reply_to_user.userrname)
         elif ret == 'SUCCESS':
-            safe_reply(message, "@%s has decreased @%s's Faith! Shame!" % (username, reply_to_user.username))
+            safe_reply(message, "@%s has decreased @%s's Faith! Shame!" % (user.username, reply_to_user.username))
 
 
 @bot.message_handler(commands=['getpastors'])
